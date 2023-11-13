@@ -29,18 +29,36 @@ Station = Base.classes.station
 # Create our session (link) from Python to the DB
 session = Session(engine)
 
+
+
+#################################################
+# Database exploration
+#################################################
+
+# Find the time range in data set (to run the query only once).
+date_range=session.query(Measurement.date)
+
+# Find the latest date in the data set.
+latest_date=date_range.order_by(Measurement.date.desc()).first()
+latest_date=str(latest_date[0])
+
+# Find the first date in the data set (to later provide meaniful messages to run the API).
+first_date=date_range.order_by(Measurement.date).first()
+first_date=str(first_date[0])
+
 # Calculate the date one year from the last date in data set.
-latest_date=session.query(Measurement.date).order_by(Measurement.date.desc()).first()
+start_date_365=dt.datetime.strptime(latest_date,'%Y-%m-%d').date() - dt.timedelta(days=365)
+
+# Identify the most active station in the dataset
+active_station=session.query(Measurement.station, func.count(Measurement.station)).group_by(Measurement.station).order_by(func.count(Measurement.station).desc())
+
 session.close()
-x=str(latest_date[0])
-start_date=dt.datetime.strptime(x,'%Y-%m-%d').date() - dt.timedelta(days=365)
 
 
 #################################################
 # Flask Setup
 #################################################
 app = Flask(__name__)
-
 
 
 #################################################
@@ -52,21 +70,51 @@ def welcome():
     """List all available api routes."""
 
     html="""
-    <h1> Hawaii Weather Data </h1>
+    <style>
+        .add-link::after {
+            content: " " attr(href) "";
+        }
+
+    </style>
+    
+    <body>
+    <br>
+    <h1> Honolulu, Hawaii Weather Data </h1>
+    <br>
+    <h2> API documentation </h2>
+    <p> To access the API giving the precipitation for the last 365 days on record: </p>
     <ul>
-    <a href="/api/v1.0/precipitation">Precipitation for the last 365 days on record</a>
-    <br>
-    <a href="/api/v1.0/stations">Monitoring Stations </a>
-    <br>
-    <a href="/api/v1.0/tobs">Temperature from the most active station for the last 365 days on record</a>
-    <br>
-    <a href="/api/v1.0/<start>">Min, Average, and Max temperatures per station since start = yyyy-mm-dd </a>
-     <br>
-    <a href="/api/v1.0/<start>/<end>">Min, Average, and Max temperatures per station between start = yyyy-mm-dd and end = yyyy-mm-dd</a><br>
+    <a href="/api/v1.0/precipitation">/api/v1.0/precipitation</a>
     </ul>
+    <br>
+
+    <p> To access the API giving the list of the monitoring stations on record: </p>
+    <ul>
+    <a href="/api/v1.0/stations">/api/v1.0/stations </a>
+    </ul>
+    <br>
+
+    <p> To access the API giving the temperatures from the most active station for the last 365 days on record" </p>
+    <ul>
+    <a href="/api/v1.0/tobs">/api/v1.0/tobs</a>
+    </ul>
+    <br>
+
+    <p> To access the API giving the Min, Average, and Max temperatures since a user-defined start date (yyyy-mm-dd): </p>
+    <ul>
+    <a class ="add-link" href="/api/v1.0/<start>"> </a>
+    </ul>
+    <br>
+
+    <p> To access the API giving the Min, Average, and Max temperatures between two user-defined dates (yyyy-mm-dd): </p>
+    <ul>
+    <a class ="add-link" href="/api/v1.0/<start>/<end>"> </a>
+    <br>
+    </ul>
+    </body>
     """
     return (html)
-
+# To display the <start> and <end> in the API link: https://stackoverflow.com/questions/10634494/how-can-i-display-the-href-as-the-text-too
 
 @app.route("/api/v1.0/precipitation")
 def precipitation():
@@ -76,16 +124,17 @@ def precipitation():
     """Return a list of precipitation data for the last 12 months of data"""
     # Query the precipitation
 
+
     # Perform a query to retrieve the data and precipitation scores for the last 365 days on record
-    prcp_last_12=session.query(Measurement.date,Measurement.prcp).filter(Measurement.date >= start_date).all()
+    prcp_last_12=session.query(Measurement.station, Measurement.date, Measurement.prcp).filter(Measurement.date >= start_date_365).all()
 
     session.close()
 
-    # Create a dictionary from the row data and append to a list of all_passengers
+    # Convert the query results to a dictionary using date as the key and prcp as the value.
     all_precipitation = []
-    for date, prcp in prcp_last_12:
+    for station, date, prcp in prcp_last_12:
         precipitation_dict = {}
-        precipitation_dict[date] = prcp
+        precipitation_dict[station] = {date:prcp}
         all_precipitation.append(precipitation_dict)
 
     return jsonify(all_precipitation)
@@ -104,7 +153,7 @@ def stations():
   
     session.close()
 
-    # Create a dictionary from the row data and append to a list of all_passengers
+    # Create a dictionary from the row data and append to a list of dictionaries for each station
     all_stations = []
     for station, name in results:
         station_dict = {}
@@ -124,12 +173,12 @@ def temp():
 
     """Return a list of the temperature observations of the most active station for the last 365 days on record"""
     # Query the station names
-    active_station=session.query(Measurement.station, func.count(Measurement.station)).group_by(Measurement.station).order_by(func.count(Measurement.station).desc())
-    results=session.query(Measurement.station,Measurement.date,Measurement.tobs).filter(Measurement.date >= start_date).filter(Measurement.station==active_station[0][0]).all()
+   
+    results=session.query(Measurement.station,Measurement.date,Measurement.tobs).filter(Measurement.date >= start_date_365).filter(Measurement.station==active_station[0][0]).all()
   
     session.close()
 
-    # Create a dictionary from the row data and append to a list of all_passengers
+    # Create a dictionary from the row data and append to a list of dictionaries for each station
     most_active_station = []
     for station, date, tobs in results:
         station_dict = {}
@@ -145,6 +194,10 @@ def temp():
 
 @app.route("/api/v1.0/<start>")
 def temp_start_stats(start):
+    
+    if start=="<start>":
+        return jsonify({"Input needed":f"Replace <start> in the URL with a date from {first_date} following the yyy-mm-dd format"})
+    
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
@@ -153,18 +206,26 @@ def temp_start_stats(start):
     tmin=func.min(Measurement.tobs)
     tavg=func.avg(Measurement.tobs)
     tmax=func.max(Measurement.tobs)
-    results=session.query(Measurement.station,tmin,tavg,tmax).group_by(Measurement.station).filter(Measurement.date >= start).all()
-  
+    # results=session.query(Measurement.station,tmin,tavg,tmax).group_by(Measurement.station).filter(Measurement.date >= start).all()
+    results=session.query(tmin,tavg,tmax).filter(Measurement.date >= start).all()
+
     session.close()
 
     # Create a dictionary from the row data and append to a list of stats per station
     temp_stats = []
-    for station, tmin,tavg,tmax in results:
+    # for station, tmin,tavg,tmax in results:
+    #     station_dict = {}
+    #     # station_dict["station"] = station
+    #     # station_dict["date"] = date
+    #     station_dict[station] = {"TMIN":tmin,"TAVG":tavg,"TMAX":tmax}
+    #     temp_stats.append(station_dict)
+
+    for tmin,tavg,tmax in results:
         station_dict = {}
-        # station_dict["station"] = station
-        # station_dict["date"] = date
-        station_dict[station] = [tmin,tavg,tmax]
-        temp_stats.append(station_dict)
+        station_dict["TMIN"] = tmin
+        station_dict["TAGV"] = tavg
+        station_dict["TMAX"] = tmax
+        temp_stats.append(station_dict)   
 
     return jsonify(temp_stats)
 
@@ -173,6 +234,9 @@ def temp_start_stats(start):
 
 @app.route("/api/v1.0/<start>/<end>")
 def temp_start_end_stats(start,end):
+
+    if (start=="<start>" or end=="<end>"):
+        return jsonify({"Input needed":f"Replace <start> and <end> in the URL with dates between {first_date} and {latest_date} following the yyy-mm-dd format"})
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
@@ -181,18 +245,18 @@ def temp_start_end_stats(start,end):
     tmin=func.min(Measurement.tobs)
     tavg=func.avg(Measurement.tobs)
     tmax=func.max(Measurement.tobs)
-    results=session.query(Measurement.station,tmin,tavg,tmax).group_by(Measurement.station).filter(Measurement.date >= start).filter(Measurement.date <= end).all()
+    results=session.query(tmin,tavg,tmax).filter(Measurement.date >= start).filter(Measurement.date <= end).all()
   
     session.close()
 
     # Create a dictionary from the row data and append to a list of stats per station
     temp_stats = []
-    for station, tmin,tavg,tmax in results:
+    for tmin,tavg,tmax in results:
         station_dict = {}
-        # station_dict["station"] = station
-        # station_dict["date"] = date
-        station_dict[station] = [tmin,tavg,tmax]
-        temp_stats.append(station_dict)
+        station_dict["TMIN"] = tmin
+        station_dict["TAGV"] = tavg
+        station_dict["TMAX"] = tmax
+        temp_stats.append(station_dict)   
 
     return jsonify(temp_stats)
 
