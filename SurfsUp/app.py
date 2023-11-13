@@ -82,7 +82,7 @@ def welcome():
     <h1> Honolulu, Hawaii Weather Data </h1>
     <br>
     <h2> API documentation </h2>
-    <p> To access the API giving the precipitation for the last 365 days on record: </p>
+    <p> To access the API giving the precipitation data for the last 365 days on record: </p>
     <ul>
     <a href="/api/v1.0/precipitation">/api/v1.0/precipitation</a>
     </ul>
@@ -100,17 +100,25 @@ def welcome():
     </ul>
     <br>
 
-    <p> To access the API giving the Min, Average, and Max temperatures since a user-defined start date (yyyy-mm-dd): </p>
+    <p> To access the API giving the Min, Average, and Max temperatures of all the stations since a user-defined start date (yyyy-mm-dd): </p>
     <ul>
     <a class ="add-link" href="/api/v1.0/<start>"> </a>
     </ul>
     <br>
 
-    <p> To access the API giving the Min, Average, and Max temperatures between two user-defined dates (yyyy-mm-dd): </p>
+    <p> To access the API giving the Min, Average, and Max temperatures of all the stations between two user-defined dates (yyyy-mm-dd): </p>
     <ul>
     <a class ="add-link" href="/api/v1.0/<start>/<end>"> </a>
     <br>
     </ul>
+
+    <p> Test: </p>
+    <ul>
+    <a href="/api/v1.0/precipitation2"> Test dictionary precipitation</a>
+    </ul>
+    <br>
+
+
     </body>
     """
     return (html)
@@ -260,6 +268,64 @@ def temp_start_end_stats(start,end):
 
     return jsonify(temp_stats)
 
+
+#==========================================================
+# Test zone
+#==========================================================
+@app.route("/api/v1.0/precipitation2")
+def precipitation2():
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return a list of precipitation data for the last 12 months of data"""
+    # Query the precipitation
+
+
+    # Perform a query to retrieve the data and precipitation scores for the last 365 days on record
+    prcp_last_12=session.query(Measurement.station, Measurement.date, Measurement.prcp, Station.name).filter(Measurement.station==Station.station).filter(Measurement.date >= start_date_365).all()
+
+    session.close()
+
+    # Convert the query results to a dictionary using date as the key and prcp as the value.
+    all_precipitation = []
+    
+    for station, date, prcp, name in prcp_last_12:
+        precipitation_dict = {}
+        # precipitation_dict[station] = {'Station name':name}
+        precipitation_dict[station] = {'Precipitation':{date:prcp}}
+  
+        all_precipitation.append(precipitation_dict)
+    return jsonify(all_precipitation)
+
+#==========================================================
+# Test zone
+#==========================================================
+# @app.route("/api/v1.0/precipitation2")
+# def precipitation2():
+#     # Create our session (link) from Python to the DB
+#     session = Session(engine)
+
+#     """Return a list of precipitation data for the last 12 months of data"""
+#     # Query the precipitation
+
+
+#     # Perform a query to retrieve the data and precipitation scores for the last 365 days on record
+#     prcp_last_12=session.query(Measurement.station, Measurement.date, Measurement.prcp, Station.name).filter(Measurement.station==Station.station).filter(Measurement.date >= start_date_365).limit(50)
+
+#     session.close()
+
+#     # Convert the query results to a dictionary using date as the key and prcp as the value.
+#     all_precipitation = []
+#     precipitation=[]
+    
+#     for station, date, prcp, name in prcp_last_12:
+#         precipitation_dict = {}
+   
+#         precipitation.append({date:prcp})
+#         precipitation_dict[station] = {'Station name':name, 'Precipitation':precipitation}
+  
+#         all_precipitation.append(precipitation_dict)
+#     return jsonify(all_precipitation)
 
 if __name__ == '__main__':
     app.run(debug=True)
