@@ -1,3 +1,13 @@
+#==============================================
+
+# Python code to create APIs returning JSON objects
+# for queries sent to a SQLite database
+
+#==============================================
+
+
+
+
 # Import the dependencies.
 from flask import Flask, jsonify
 
@@ -82,15 +92,27 @@ def welcome():
     <h1> Honolulu, Hawaii Weather Data </h1>
     <br>
     <h2> API documentation </h2>
-    <p> To access the API giving the precipitation data for the last 365 days on record: </p>
+    <p> To access the API giving the precipitation data for the last 365 days on record from all stations: </p>
     <ul>
     <a href="/api/v1.0/precipitation">/api/v1.0/precipitation</a>
     </ul>
     <br>
 
-    <p> To access the API giving the list of the monitoring stations on record: </p>
+    <p> To access the API giving the precipitation data for the last 365 days on record from only the most active station: </p>
+    <ul>
+    <a href="/api/v1.0/precipitation2">/api/v1.0/precipitation2</a>
+    </ul>
+    <br>
+
+    <p> To access the API giving the list of the existing monitoring stations: </p>
     <ul>
     <a href="/api/v1.0/stations">/api/v1.0/stations </a>
+    </ul>
+    <br>
+
+    <p> To access the API giving the list of the monitoring stations having reported weather measurements: </p>
+    <ul>
+    <a href="/api/v1.0/stations2">/api/v1.0/stations2 </a>
     </ul>
     <br>
 
@@ -114,7 +136,7 @@ def welcome():
 
     <p> Test: </p>
     <ul>
-    <a href="/api/v1.0/precipitation2"> Test dictionary precipitation</a>
+    <a href="/api/v1.0/precipitation5"> Test dictionary precipitation</a>
     </ul>
     <br>
 
@@ -129,7 +151,7 @@ def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of precipitation data for the last 12 months of data"""
+    """Return a list of precipitation data for the last 12 months of data on record from all stations"""
     # Query the precipitation
 
 
@@ -150,12 +172,38 @@ def precipitation():
 
 
 
+@app.route("/api/v1.0/precipitation2")
+def precipitation2():
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return a list of precipitation data for the last 12 months of data from the most active station"""
+    # Query the precipitation
+
+
+    # Perform a query to retrieve the data and precipitation scores for the last 365 days on record
+    prcp_last_12=session.query(Measurement.date, Measurement.prcp).filter(Measurement.date >= start_date_365).filter(Measurement.station == active_station[0][0]).all()
+
+    session.close()
+
+    # Convert the query results to a dictionary using date as the key and prcp as the value.
+    all_precipitation = []
+    for date, prcp in prcp_last_12:
+        precipitation_dict = {}
+        precipitation_dict[date] = prcp
+        all_precipitation.append(precipitation_dict)
+
+    return jsonify(all_precipitation)
+
+
+
+
 @app.route("/api/v1.0/stations")
 def stations():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of the station from the dataset"""
+    """Return a list of the station from the station table"""
     # Query the station names
     results=session.query(Station.station,Station.name).all()
   
@@ -165,12 +213,33 @@ def stations():
     all_stations = []
     for station, name in results:
         station_dict = {}
-        # station_dict["station"] = station
         station_dict[station] = name
         all_stations.append(station_dict)
 
     return jsonify(all_stations)
 
+
+
+
+@app.route("/api/v1.0/stations2")
+def stations2():
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return a list of the station and their name from the measurement and the station tables"""
+    # Query the station names
+    results=session.query(Measurement.station, Station.name).filter(Measurement.station==Station.station).group_by(Measurement.station).all()
+  
+    session.close()
+
+    # Create a dictionary from the row data and append to a list of dictionaries for each station
+    all_stations = []
+    for station, name in results:
+        station_dict = {}
+        station_dict[station] = name
+        all_stations.append(station_dict)
+
+    return jsonify(all_stations)
 
 
 
@@ -182,16 +251,14 @@ def temp():
     """Return a list of the temperature observations of the most active station for the last 365 days on record"""
     # Query the station names
    
-    results=session.query(Measurement.station,Measurement.date,Measurement.tobs).filter(Measurement.date >= start_date_365).filter(Measurement.station==active_station[0][0]).all()
+    results=session.query(Measurement.date,Measurement.tobs).filter(Measurement.date >= start_date_365).filter(Measurement.station==active_station[0][0]).all()
   
     session.close()
 
     # Create a dictionary from the row data and append to a list of dictionaries for each station
     most_active_station = []
-    for station, date, tobs in results:
+    for date, tobs in results:
         station_dict = {}
-        # station_dict["station"] = station
-        # station_dict["date"] = date
         station_dict[date] = tobs
         most_active_station.append(station_dict)
 
@@ -209,24 +276,17 @@ def temp_start_stats(start):
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of the temperature observations from a start date"""
+    """Return a list of the temperature statistics from all stations since a start date"""
     # Query the temperature statistics
     tmin=func.min(Measurement.tobs)
     tavg=func.avg(Measurement.tobs)
     tmax=func.max(Measurement.tobs)
-    # results=session.query(Measurement.station,tmin,tavg,tmax).group_by(Measurement.station).filter(Measurement.date >= start).all()
     results=session.query(tmin,tavg,tmax).filter(Measurement.date >= start).all()
 
     session.close()
 
     # Create a dictionary from the row data and append to a list of stats per station
     temp_stats = []
-    # for station, tmin,tavg,tmax in results:
-    #     station_dict = {}
-    #     # station_dict["station"] = station
-    #     # station_dict["date"] = date
-    #     station_dict[station] = {"TMIN":tmin,"TAVG":tavg,"TMAX":tmax}
-    #     temp_stats.append(station_dict)
 
     for tmin,tavg,tmax in results:
         station_dict = {}
@@ -272,8 +332,8 @@ def temp_start_end_stats(start,end):
 #==========================================================
 # Test zone
 #==========================================================
-@app.route("/api/v1.0/precipitation2")
-def precipitation2():
+@app.route("/api/v1.0/precipitation5")
+def precipitation5():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
@@ -300,8 +360,8 @@ def precipitation2():
 #==========================================================
 # Test zone
 #==========================================================
-# @app.route("/api/v1.0/precipitation2")
-# def precipitation2():
+# @app.route("/api/v1.0/precipitation5")
+# def precipitation5():
 #     # Create our session (link) from Python to the DB
 #     session = Session(engine)
 

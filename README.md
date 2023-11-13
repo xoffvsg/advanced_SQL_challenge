@@ -40,19 +40,24 @@ The most active station is the station USC00519281 located in WAIHEE, which repo
 Figure 2
 <br><br>
 
-The findings above can be reviewed in the <i>climate_starter.ipynb</i> file.
+The findings above can be reviewed in the <i>SurfsUp/climate_starter.ipynb</i> file.
 <br>
 
-Next, several APIs are created in the <i> app.py </i> file that reports jsonify lists from queries made to the SQLite database via SQLAlchemy ORM. The API URLs are tested locally by setting a Flask server session on the localhost computer.
+Next, several APIs are created in the <i> SurfsUp/app.py </i> file that reports jsonify lists from queries made to the SQLite database via SQLAlchemy ORM. The API URLs are tested locally by setting a Flask server session on the localhost computer.
 <br>
 The link **/** is the home page documenting the available APIs.<br>
 
-The first API **/api/v1.0/precipitation<** reports a list of dictionaries corresponding to the last 12 months of precipitation data with the date as a key and the corresponding precipitation measurement as the value. Note that the question does not specify if this query should be done for all stations or just for the most active station, therefore the pair date/precipitation is reported as nested dictionaries with the station identifier as the key. Doing otherwise would have only reported the date/precipitation collected by the last station in the query. <br>
+The first API **/api/v1.0/precipitation** reports a list of dictionaries corresponding to the last 12 months of precipitation data with the date as a key and the corresponding precipitation measurement as the value. Note that the question does not specify if this query should be done for all stations or just for the most active station, therefore the pair date/precipitation is reported as nested dictionaries with the station identifier as the key. Doing otherwise would have only reported the date/precipitation collected by the last station in the query. <br>
+This extra step is not necessary if the question was supposed to be applied to a single station and the key:value pair (date:prcp) can be reported directly as shown in the second API **/api/v1.0/precipitation2** . <br>
 
-The second API **/api/v1.0/stations** reports the list of the stations from the station table in the database.<br>
+The third API **/api/v1.0/stations** reports the list of the stations from the station table in the database.<br>
 
-The third API **/api/v1.0/tobs** reports the temperature observations collected by the most active station (USC00519281) over the last 12 months in the dataset<br>
+Remark: None of the questions, as asked, would require to run a query joining the two tables in the database. Therefore, a fourth API **/api/v1.0/stations2** reports the list of the stations identifiers from the measurement table and associate them with the station name queried from the station table in the database. Unsurprisingly, it gives the same output as the **/api/v1.0/stations** API.<br>
 
-The fourth API **/api/v1.0/start** and the fifth  **/api/v1.0/start/end** report the minimum TMIN, the average TAVG, and the max TMAX temperatures measured by all stations for the dates from the start date to the end date, inclusive .<br>
+The fith API **/api/v1.0/tobs** reports the temperature observations collected by the most active station (USC00519281) over the last 12 months in the dataset<br>
+
+The sixth API **/api/v1.0/start** and the seventh  **/api/v1.0/start/end** report the minimum TMIN, the average TAVG, and the max TMAX temperatures measured by all stations for the dates from the start date to the end date, inclusive .<br>
+
+
 
 
