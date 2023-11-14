@@ -59,7 +59,7 @@ first_date=str(first_date[0])
 # Calculate the date one year from the last date in data set.
 start_date_365=dt.datetime.strptime(latest_date,'%Y-%m-%d').date() - dt.timedelta(days=365)
 
-# Identify the most active station in the dataset
+# Identify the most active station in the dataset (to run the query only once).
 active_station=session.query(Measurement.station, func.count(Measurement.station)).group_by(Measurement.station).order_by(func.count(Measurement.station).desc())
 
 session.close()
@@ -134,11 +134,7 @@ def welcome():
     <br>
     </ul>
 
-    <p> Test: </p>
-    <ul>
-    <a href="/api/v1.0/precipitation5"> Test dictionary precipitation</a>
-    </ul>
-    <br>
+
 
 
     </body>
@@ -152,22 +148,23 @@ def precipitation():
     session = Session(engine)
 
     """Return a list of precipitation data for the last 12 months of data on record from all stations"""
+
     # Query the precipitation
-
-
     # Perform a query to retrieve the data and precipitation scores for the last 365 days on record
     prcp_last_12=session.query(Measurement.station, Measurement.date, Measurement.prcp).filter(Measurement.date >= start_date_365).all()
 
     session.close()
 
     # Convert the query results to a dictionary using date as the key and prcp as the value.
-    all_precipitation = []
+    all_precipitation = {}
     for station, date, prcp in prcp_last_12:
-        precipitation_dict = {}
-        precipitation_dict[station] = {date:prcp}
-        all_precipitation.append(precipitation_dict)
+        if station not in all_precipitation:
+            all_precipitation[station] = {}
+        all_precipitation[station][date] = prcp
 
     return jsonify(all_precipitation)
+
+
 
 
 
@@ -178,20 +175,20 @@ def precipitation2():
     session = Session(engine)
 
     """Return a list of precipitation data for the last 12 months of data from the most active station"""
+
     # Query the precipitation
-
-
-    # Perform a query to retrieve the data and precipitation scores for the last 365 days on record
+    # Perform a query to retrieve the data and precipitation scores for the last 365 days on record collected by the most active station
     prcp_last_12=session.query(Measurement.date, Measurement.prcp).filter(Measurement.date >= start_date_365).filter(Measurement.station == active_station[0][0]).all()
 
     session.close()
 
     # Convert the query results to a dictionary using date as the key and prcp as the value.
-    all_precipitation = []
+
+    all_precipitation = {}
     for date, prcp in prcp_last_12:
-        precipitation_dict = {}
-        precipitation_dict[date] = prcp
-        all_precipitation.append(precipitation_dict)
+        if date not in all_precipitation:
+            all_precipitation[date] = {}
+        all_precipitation[date] = prcp
 
     return jsonify(all_precipitation)
 
@@ -209,12 +206,12 @@ def stations():
   
     session.close()
 
-    # Create a dictionary from the row data and append to a list of dictionaries for each station
-    all_stations = []
+    all_stations = {}
     for station, name in results:
-        station_dict = {}
-        station_dict[station] = name
-        all_stations.append(station_dict)
+        if station not in all_stations:
+            all_stations[station] = {}
+        all_stations[station] = name
+
 
     return jsonify(all_stations)
 
@@ -227,17 +224,18 @@ def stations2():
     session = Session(engine)
 
     """Return a list of the station and their name from the measurement and the station tables"""
+
     # Query the station names
     results=session.query(Measurement.station, Station.name).filter(Measurement.station==Station.station).group_by(Measurement.station).all()
   
     session.close()
 
-    # Create a dictionary from the row data and append to a list of dictionaries for each station
-    all_stations = []
+    # Create a dictionary from the row data
+    all_stations = {}
     for station, name in results:
-        station_dict = {}
-        station_dict[station] = name
-        all_stations.append(station_dict)
+        if station not in all_stations:
+            all_stations[station] = {}
+        all_stations[station] = name
 
     return jsonify(all_stations)
 
@@ -249,18 +247,17 @@ def temp():
     session = Session(engine)
 
     """Return a list of the temperature observations of the most active station for the last 365 days on record"""
-    # Query the station names
-   
+
+    # Query the temperature data for the last 365 days on record collected by the most active station
     results=session.query(Measurement.date,Measurement.tobs).filter(Measurement.date >= start_date_365).filter(Measurement.station==active_station[0][0]).all()
   
     session.close()
 
-    # Create a dictionary from the row data and append to a list of dictionaries for each station
-    most_active_station = []
+    most_active_station = {}  
     for date, tobs in results:
-        station_dict = {}
-        station_dict[date] = tobs
-        most_active_station.append(station_dict)
+        if date not in most_active_station:
+            most_active_station[date] = {}
+        most_active_station[date] = tobs 
 
     return jsonify(most_active_station)
 
@@ -277,6 +274,7 @@ def temp_start_stats(start):
     session = Session(engine)
 
     """Return a list of the temperature statistics from all stations since a start date"""
+
     # Query the temperature statistics
     tmin=func.min(Measurement.tobs)
     tavg=func.avg(Measurement.tobs)
@@ -285,15 +283,18 @@ def temp_start_stats(start):
 
     session.close()
 
-    # Create a dictionary from the row data and append to a list of stats per station
-    temp_stats = []
-
+    # Create a dictionary from the row data
+    temp_stats = {}  
     for tmin,tavg,tmax in results:
-        station_dict = {}
-        station_dict["TMIN"] = tmin
-        station_dict["TAGV"] = tavg
-        station_dict["TMAX"] = tmax
-        temp_stats.append(station_dict)   
+        if 'TMIN' not in temp_stats:
+            temp_stats['TMIN'] = {}
+        temp_stats['TMIN'] = tmin 
+        if 'TAVG' not in temp_stats:
+            temp_stats['TAVG'] = {}
+        temp_stats['TAVG'] = tavg 
+        if 'TMAX' not in temp_stats:
+            temp_stats['TMAX'] = {}
+        temp_stats['TMAX'] = tmax 
 
     return jsonify(temp_stats)
 
@@ -308,7 +309,8 @@ def temp_start_end_stats(start,end):
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of the temperature observations from a start date"""
+    """Return a list of the temperature observations between a start date and a end date"""
+
     # Query the temperature statistics
     tmin=func.min(Measurement.tobs)
     tavg=func.avg(Measurement.tobs)
@@ -318,74 +320,22 @@ def temp_start_end_stats(start,end):
     session.close()
 
     # Create a dictionary from the row data and append to a list of stats per station
-    temp_stats = []
+    temp_stats = {}  
     for tmin,tavg,tmax in results:
-        station_dict = {}
-        station_dict["TMIN"] = tmin
-        station_dict["TAGV"] = tavg
-        station_dict["TMAX"] = tmax
-        temp_stats.append(station_dict)   
+        if 'TMIN' not in temp_stats:
+            temp_stats['TMIN'] = {}
+        temp_stats['TMIN'] = tmin 
+        if 'TAVG' not in temp_stats:
+            temp_stats['TAVG'] = {}
+        temp_stats['TAVG'] = tavg 
+        if 'TMAX' not in temp_stats:
+            temp_stats['TMAX'] = {}
+        temp_stats['TMAX'] = tmax 
 
     return jsonify(temp_stats)
 
 
-#==========================================================
-# Test zone
-#==========================================================
-@app.route("/api/v1.0/precipitation5")
-def precipitation5():
-    # Create our session (link) from Python to the DB
-    session = Session(engine)
 
-    """Return a list of precipitation data for the last 12 months of data"""
-    # Query the precipitation
-
-
-    # Perform a query to retrieve the data and precipitation scores for the last 365 days on record
-    prcp_last_12=session.query(Measurement.station, Measurement.date, Measurement.prcp, Station.name).filter(Measurement.station==Station.station).filter(Measurement.date >= start_date_365).all()
-
-    session.close()
-
-    # Convert the query results to a dictionary using date as the key and prcp as the value.
-    all_precipitation = []
-    
-    for station, date, prcp, name in prcp_last_12:
-        precipitation_dict = {}
-        # precipitation_dict[station] = {'Station name':name}
-        precipitation_dict[station] = {'Precipitation':{date:prcp}}
-  
-        all_precipitation.append(precipitation_dict)
-    return jsonify(all_precipitation)
-
-#==========================================================
-# Test zone
-#==========================================================
-# @app.route("/api/v1.0/precipitation5")
-# def precipitation5():
-#     # Create our session (link) from Python to the DB
-#     session = Session(engine)
-
-#     """Return a list of precipitation data for the last 12 months of data"""
-#     # Query the precipitation
-
-
-#     # Perform a query to retrieve the data and precipitation scores for the last 365 days on record
-#     prcp_last_12=session.query(Measurement.station, Measurement.date, Measurement.prcp, Station.name).filter(Measurement.station==Station.station).filter(Measurement.date >= start_date_365).limit(50)
-
-#     session.close()
-
-#     # Convert the query results to a dictionary using date as the key and prcp as the value.
-#     all_precipitation = []
-#     precipitation=[]
-    
-#     for station, date, prcp, name in prcp_last_12:
-#         precipitation_dict = {}
-   
-#         precipitation.append({date:prcp})
-#         precipitation_dict[station] = {'Station name':name, 'Precipitation':precipitation}
-  
-#         all_precipitation.append(precipitation_dict)
-#     return jsonify(all_precipitation)
 
 if __name__ == '__main__':
     app.run(debug=True)
