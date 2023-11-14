@@ -43,7 +43,7 @@ Figure 2
 The findings above can be reviewed in the <i>SurfsUp/climate_starter.ipynb</i> file.
 <br>
 
-Next, several APIs are created in the <i> SurfsUp/app.py </i> file that reports jsonify lists from queries made to the SQLite database via SQLAlchemy ORM. The API URLs are tested locally by setting a Flask server session on the localhost computer.
+Next, several APIs are created in the <i> SurfsUp/app.py </i> file that reports jsonify dictionaries from queries made to the SQLite database via SQLAlchemy ORM. The API URLs are tested locally by setting a Flask server session on the localhost computer.
 <br>
 The link **/** is the home page documenting the available APIs.<br>
 
